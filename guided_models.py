@@ -54,14 +54,16 @@ class GuidedDiffusion(Diffusion):
             self.B = 0
         self.num_steps = 0
 
-    def evaluate(self, x, t):        
-        return self.value_function(x, self.T - 1 - t)
+    def evaluate(self, x, t):
+        x = np.squeeze(x, axis=0)
+        t_arr = [self.T - 1 - t] * x.shape[0]
+        return self.value_function(x, t_arr)
     
     def single_step(self, t, X):
         N = X.shape[0]
         proposal_fixed = lambda size, src: super(GuidedDiffusion, self).single_step_iid_copies(t, src, size)
         eval_fixed = lambda x: self.evaluate(x, t)
-        Z =  vec_rejection_val(X, proposal_fixed, eval_fixed, self.B, batch_size=None)
+        Z =  vec_rejection_val(X, proposal_fixed, eval_fixed, self.B)
         self.num_steps += Z[1]
         return Z[0]
     

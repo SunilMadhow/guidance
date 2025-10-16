@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
 
 class TrajectoryDataset(Dataset):
     def __init__(self, X, expr):
@@ -40,6 +41,7 @@ class ValueEstimate(nn.Module):
           - a TrajectoryDataset + DataLoader
           - Adam optimizer & MSE loss
         """
+        print("Building ValueEstimate...")
         super().__init__()
         if isinstance(X, np.ndarray):
             X = X.copy()
@@ -96,7 +98,7 @@ class ValueEstimate(nn.Module):
                 print(f"[Epoch {epoch:02d}] avg MSE: {avg_mse:.4f}")
         return avg_mse
     
-    def predict(self, x, t):
+    def predict(self, x, t, requires_grad = False):
         """
         Predict values for vectorized input.
         Args:
@@ -120,16 +122,60 @@ class ValueEstimate(nn.Module):
         x = x.to(self.device)
         t = t.to(self.device)
 
-        # print(f"x shape: {x.shape}, t shape: {t.shape}")
-        # Build time features and concatenate with x
-        time_feat = t.unsqueeze(-1) / (self.T - 1)  # Normalize t #this had a -1 before
-        inp = torch.cat([x, time_feat], dim=-1)    # Concatenate x and t
+        time_feat = t.unsqueeze(-1) / (self.T - 1)
+        
 
-        # Predict
+        # print("x shape:", x.shape)
+        # print("time_feat shape:", time_feat.shape)
+        inp = torch.cat([x, time_feat], dim=-1)
+
         self.net.eval()
-        with torch.no_grad():
-            predictions = self.forward(inp)        # Shape (n,)
-        return predictions.numpy()
+        if requires_grad:
+            predictions = self.forward(inp)
+            return predictions
+        else:
+            with torch.no_grad():
+                predictions = self.forward(inp)
+            return predictions.numpy()
+        
+    def predict_under_log(self, x, t, requires_grad = False):
+            """
+            Predict values for vectorized input.
+            Args:
+                x: array-like or tensor of shape (n, d) where n is the number of samples
+                t: array-like or tensor of shape (n,) corresponding to time values
+            Returns:
+                predictions: tensor of shape (n,) containing predicted values
+            """
+            # Convert x and t to tensors if they are not already
+            if isinstance(x, np.ndarray):
+                x = torch.from_numpy(x).float()
+            elif not torch.is_tensor(x):
+                x = torch.tensor(x, dtype=torch.float32)
+
+            if isinstance(t, np.ndarray):
+                t = torch.from_numpy(t).float()
+            elif not torch.is_tensor(t):
+                t = torch.tensor(t, dtype=torch.float32)
+
+            # Ensure x and t are on the correct device
+            x = x.to(self.device)
+            t = t.to(self.device)
+
+            time_feat = t.unsqueeze(-1) / (self.T - 1)
+            inp = torch.cat([x, time_feat], dim=-1)
+
+            self.net.eval()
+            if requires_grad:
+                predictions = self.forward(inp)
+                preds_pos = F.softplus(predictions) + 1e-6   # POSITIVE & SMOOTH
+                return torch.log(preds_pos)
+            else:
+                with torch.no_grad():
+                    predictions = self.forward(inp)
+                    preds_pos = F.softplus(predictions) + 1e-6
+                return np.log(preds_pos.cpu().numpy())
+    
 
 
 import torch

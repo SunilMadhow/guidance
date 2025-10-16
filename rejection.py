@@ -5,7 +5,7 @@ def vec_rejection_val(
     proposal_rvs,         # fn size=(K,P), src→ draws of shape (K,P)
     val,                  # fn X, S → log‑weight array, shape (K,P)
     B,                    # either scalar or fn S→ array shape (K,)
-    batch_size=None
+    batch_size=1
 ):
     """
     For each starting state s in init_states, draw one sample x ~ q(·|s) by rejection:
@@ -19,18 +19,18 @@ def vec_rejection_val(
     total_proposals = 0 
 
 
-    # if no batch_size, pick something so you get ~1 acceptance per iteration
-    if batch_size is None:
-        # a rough α ≈ mean[exp(val(s_sample,s) - B(s))]
-        # we just draw one proposal per state to estimate α
-        test_x = proposal_rvs(size=N, src=init_states)
-        # print("shape of test_x", test_x.shape)
-        # print("shape of vals", np.exp(val(test_x)).shape)
-        est_R  = np.exp(val(test_x))/np.exp(B)  # shape (N,)
-        # print("shape of est_R", est_R.shape)
-        alpha  = np.mean(est_R)
-        batch_size = max(1, int(np.ceil(1/alpha)))
-    # print("batch_size", batch_size)
+    # # if no batch_size, pick something so you get ~1 acceptance per iteration
+    # if batch_size is None:
+    #     # a rough α ≈ mean[exp(val(s_sample,s) - B(s))]
+    #     # we just draw one proposal per state to estimate α
+    #     test_x = proposal_rvs(size=N, src=init_states)
+    #     # print("shape of test_x", test_x.shape)
+    #     # print("shape of vals", np.exp(val(test_x)).shape)
+    #     est_R  = np.exp(val(test_x))/np.exp(B)  # shape (N,)
+    #     # print("shape of est_R", est_R.shape)
+    #     alpha  = np.mean(est_R)
+    #     batch_size = max(1, int(np.ceil(1/alpha)))
+    # # print("batch_size", batch_size)
     
 
     while not done.all():
@@ -68,7 +68,7 @@ def double_rejection(
     proposal_rvs,         # fn size=(K,P), src→ draws of shape (K,P)
     v1,                  # fn X, S → log‑weight array, shape (K,P)
     v2, # array of shape (N, ) of current values
-    batch_size=None
+    batch_size=1
 ):
     """
     For each starting state s in init_states, draw one sample x ~ q(·|s) by rejection:
