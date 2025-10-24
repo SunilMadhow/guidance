@@ -1,0 +1,62 @@
+{
+  "run_id": "2025-10-22_16-39-41",
+  "created_at": "2025-10-22T23:39:42Z",
+  "model_id": "stabilityai/stable-diffusion-2-1-base",
+  "num_inference_steps": 25,
+  "vae_scaling_factor": 0.18215,
+  "scheduler_class": "PNDMScheduler",
+  "scheduler_config": {
+    "num_train_timesteps": 1000,
+    "beta_start": 0.00085,
+    "beta_end": 0.012,
+    "beta_schedule": "scaled_linear",
+    "trained_betas": null,
+    "skip_prk_steps": true,
+    "set_alpha_to_one": false,
+    "prediction_type": "epsilon",
+    "timestep_spacing": "leading",
+    "steps_offset": 1,
+    "_use_default_values": [
+      "timestep_spacing"
+    ],
+    "_class_name": "PNDMScheduler",
+    "_diffusers_version": "0.10.0.dev0",
+    "clip_sample": false,
+    "_FrozenDict__frozen": true
+  },
+  "timesteps": [
+    961,
+    921,
+    921,
+    881,
+    841,
+    801,
+    761,
+    721,
+    681,
+    641,
+    601,
+    561,
+    521,
+    481,
+    441,
+    401,
+    361,
+    321,
+    281,
+    241,
+    201,
+    161,
+    121,
+    81,
+    41,
+    1
+  ],
+  "seed": 1234,
+  "device_dtype": "torch.float32",
+  "libs": {
+    "diffusers": "0.35.2",
+    "torch": "2.5.1"
+  },
+  "steps_sha256_csv": "14b8ff21a13b64c7d20a781b2fe695b2d2d0b7816773258e425092457d8587af"
+}

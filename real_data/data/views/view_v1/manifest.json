@@ -1,0 +1,51 @@
+{
+  "view_id": "view_v1",
+  "created_at": "2025-10-24T18:11:16Z",
+  "runs": [
+    "2025-10-22_16-53-39"
+  ],
+  "sources": [
+    {
+      "run_id": "2025-10-22_16-53-39",
+      "steps_parquet": "../../runs/2025-10-22_16-53-39/steps.parquet",
+      "steps_sha256": "eb7b395b01e37c4bbaa73a796842ad6b78957c5a72ca72ccc9375eec2db4ef2c",
+      "rewards_parquet": "../../runs/2025-10-22_16-53-39/rewards.parquet",
+      "rewards_sha256": "edc631de64dac1fbde232435225bbf27db00dd8ea0c00033aea905d83dcdf804",
+      "rows_after_filter": 250,
+      "unique_samples_after_filter": 10
+    }
+  ],
+  "filters": {
+    "reward_min": null,
+    "step_idx_range": "0:24",
+    "prompts_regex": ".*"
+  },
+  "constraints": {
+    "noise_type": "logsnr"
+  },
+  "row_count": 250,
+  "unique_samples": 10,
+  "rows_sha256_csv": "bb86007d2501e1f5a35ff782238b67bfc2c72d6a86a90e6019db4ffe205a35a3",
+  "noise_stats": {
+    "mean": -1.1544361698627472,
+    "std": 2.2456637068673104
+  },
+  "paths": {
+    "rows_parquet": "rows.parquet",
+    "splits_json": "splits.json"
+  },
+  "schema": [
+    "run_id",
+    "sample_id",
+    "step_idx",
+    "timestep",
+    "noise_scalar",
+    "noise_type",
+    "latent_path",
+    "image_path",
+    "prompt",
+    "negative_prompt",
+    "score_raw",
+    "reward"
+  ]
+}

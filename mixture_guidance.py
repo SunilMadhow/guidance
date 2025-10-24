@@ -218,12 +218,12 @@ class MixtureSpecificGuidance(Diffusion):
 
             # v_t on proposals
             t_arr = [self.T - 1 - t] * (batch_size * Ka)
-            # t_arr = [t]*(batch_size * Ka)
             v_vals  = self._value_eval(t_arr, Xflat).reshape(batch_size, Ka)      # (B,Ka)
 
             # Acceptance: exp( v_t(x) - φ_t(μ) - tail )
             numer   = v_vals - phi_mu[active][None, :] - tail
             R       = np.exp(numer)
+            R       = np.clip(R, 0.0, 1.0)
             U       = np.random.rand(batch_size, Ka)
             accept  = (U < R)
             for k in range(Ka):

@@ -88,6 +88,7 @@ class ChernoffGuidance(Diffusion):
                  S=10_000,
                  hidden=(64, 64),
                  lr=1e-3,
+                 lam_lr = 1e-3,
                  iters=200,
                  erm_error=0.0,          # SLT/ERM uniform slack added to tau
                  verbose=False,
@@ -108,6 +109,7 @@ class ChernoffGuidance(Diffusion):
         # Manual lambda control
         self.fix_lambda = bool(fix_lambda)
         self.lambda_value = float(lambda_value)
+        self.lam_lr = lam_lr
 
         # Whether the value_fn expects reversed time index
         self.reverse_value_time = bool(reverse_value_time)
@@ -126,16 +128,10 @@ class ChernoffGuidance(Diffusion):
         # Proposal accounting
         self.num_steps = 0
 
-    # ---------------- helper: map generation step -> value index ----------------
-    def _value_time_index(self, t_scalar):
-        """
-        Returns the time index to pass to value_fn for step t.
-        If reverse_value_time is True, returns T-1-t; else returns t.
-        Accepts scalar t or numpy array of t's and returns same type.
-        """
-        if self.reverse_value_time:
-            return (self.T - 1) - np.asarray(t_scalar)
-        return np.asarray(t_scalar)
+    def __tostr__(self):
+        return (f"ChernoffGuidance(S={self.S}, T={self.T}, d={self.d}, "
+                f"delta={self.delta}, iters={self.iters}, erm_error={self.erm_error}, "
+                f"taus={self.taus}, lambdas={self.lambdas}), num_steps={self.num_steps}")
 
     # ---------------- helper: value eval (API expects log-values) ----------------
     def _value_eval_numpy(self, t, X):
@@ -146,17 +142,16 @@ class ChernoffGuidance(Diffusion):
         """
         X = np.asarray(X)
         n = X.shape[0]
-        t_mapped = self._value_time_index(t)
         try:
-            out = self.value_fn(t_mapped, X)
+            out = self.value_fn(t, X)
         except TypeError:
-            out = self.value_fn(np.full((n,), t_mapped), X)
+            out = self.value_fn(np.full((n,), t), X)
         if isinstance(out, torch.Tensor):
             out = out.detach().cpu().numpy()
         out = np.asarray(out).reshape(n)
         if self.verbose:
             kind = "scalar" if np.isscalar(t) or (np.ndim(t) == 0) else "array"
-            print(f"[value_eval] t({kind})={t} -> t_mapped={t_mapped} X.shape={X.shape} -> v.shape={out.shape}")
+            print(f"[value_eval] t({kind})={t} -> t_mapped={t} X.shape={X.shape} -> v.shape={out.shape}")
         return out
 
     # ---------------- ONE proposal per prefix (training) ----------------
@@ -195,6 +190,7 @@ class ChernoffGuidance(Diffusion):
         Trains the SHARED baseline on (y_{t+1}, x_t) with ONE x_t per prefix.
         Updates self.lambdas[t], self.taus[t]. Reuses self.baseline parameters.
         """
+        print(f"Training baseline and lambda at step t={t} ...")
         Ytp1 = np.asarray(Ytp1)
         N, d = Ytp1.shape
         if self.verbose:
@@ -210,7 +206,7 @@ class ChernoffGuidance(Diffusion):
             lam_param = torch.nn.Parameter(
                 torch.tensor(np.log(np.expm1(lam_init)), dtype=torch.float32, device=self.device)
             )
-            lam_opt = optim.SGD([lam_param], lr=self.lr)
+            lam_opt = optim.SGD([lam_param], lr=self.lam_lr)
 
         for it in tqdm(range(self.iters), desc=f"Chernoff b_(t+1) @ t={t}"):
             B = min(batch_size, N)
@@ -221,7 +217,7 @@ class ChernoffGuidance(Diffusion):
             Ytp1_b, Xt_b = self._sample_joint_pairs(t, Ytp1_b)  # (B, d), (B, d)
 
             # v_t on proposals (log-values)
-            t_arr = np.full(Xt_b.shape[0], t, dtype=int)
+            t_arr = np.full(Xt_b.shape[0], self.T - t - 1, dtype=int)
             vt_np = self._value_eval_numpy(t_arr, Xt_b)         # (B,)
             vt = torch.tensor(vt_np, dtype=torch.float32, device=self.device)
 
@@ -275,7 +271,7 @@ class ChernoffGuidance(Diffusion):
 
         with torch.no_grad():
             _, Xt_all = self._sample_joint_pairs(t, Ytp1)
-            t_arr = np.full(Xt_all.shape[0], t, dtype=int)
+            t_arr = np.full(Xt_all.shape[0], self.T - t - 1, dtype=int)
             vt_np = self._value_eval_numpy(t_arr, Xt_all)
             vt = torch.tensor(vt_np, dtype=torch.float32, device=self.device)
             logu_all = self.baseline(torch.tensor(Ytp1, dtype=torch.float32, device=self.device), t+1)
@@ -311,7 +307,7 @@ class ChernoffGuidance(Diffusion):
             Xflat = Xprop.reshape(batch_size * Ka, d)
 
             # v_t on proposals
-            t_arr = np.full(Xflat.shape[0], t, dtype=int)
+            t_arr = np.full(Xflat.shape[0], self.T - t - 1, dtype=int)
             v_vals = self._value_eval_numpy(t_arr, Xflat).reshape(batch_size, Ka)  # (B, Ka)
 
             # log u on prefixes (broadcast over B)
@@ -324,7 +320,7 @@ class ChernoffGuidance(Diffusion):
                       f"v_vals.shape={v_vals.shape} logu_vals.shape={logu_vals.shape}")
 
             # acceptance exponent: tau + logu(y_{t+1}) - v_t(x_t)
-            accept_log_exponent = tau + logu_vals[None, :] - v_vals               # (B, Ka)
+            accept_log_exponent = -1*(tau + logu_vals[None, :] - v_vals)              # (B, Ka)
             if self.verbose:
                 print(f"[guide] accept_log_exponent.shape={accept_log_exponent.shape} "
                       f"mean={accept_log_exponent.mean():.6f} "
@@ -332,7 +328,8 @@ class ChernoffGuidance(Diffusion):
                       f"max={accept_log_exponent.max():.6f}")
 
             # clip at 1: exp(min(0, ·))
-            R = np.exp(np.minimum(0.0, accept_log_exponent))
+            R = np.exp(accept_log_exponent)
+            print(R)
             U = np.random.rand(batch_size, Ka)
             accept = (U < R)
 
@@ -352,7 +349,7 @@ class ChernoffGuidance(Diffusion):
         return out
 
     # ---------------- overall backward train+sample ----------------
-    def train_baselines_and_sample(self, batch_size=1024):
+    def train_baselines_and_sample(self, batch_size=1024, lam_init = 0.5):
         """
         1) Initialize y_T ~ N(0, I).
         2) For t = T-2 ... 0:
@@ -370,7 +367,7 @@ class ChernoffGuidance(Diffusion):
             if self.verbose:
                 print(f"[loop] t={t} Ytp1.shape={Ytp1.shape}")
 
-            lam_t, tau_t = self.train_baseline_step(t=t, Ytp1=Ytp1, batch_size=batch_size)
+            lam_t, tau_t = self.train_baseline_step(t=t, Ytp1=Ytp1, batch_size=batch_size, lam_init=lam_init)
             if self.verbose:
                 print(f"[loop] t={t} lambda_t={lam_t:.6f} tau_t={tau_t:.6f}")
 

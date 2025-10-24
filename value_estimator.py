@@ -22,7 +22,7 @@ class TrajectoryDataset(Dataset):
         i = idx // self.T
         t = idx % self.T
         x_t = self.X[i, t]                               # (d,)
-        time_feat = torch.tensor([t / (self.T - 1)], # this was divided by T - 1 before
+        time_feat = torch.tensor([t / (self.T - 1)], 
                                  dtype=x_t.dtype)       # scalar in [0,1]
         inp = torch.cat([x_t, time_feat])               # (d+1,)
         return inp, self.expr[i]

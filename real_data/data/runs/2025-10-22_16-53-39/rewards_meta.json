@@ -1,0 +1,12 @@
+{
+  "computed_at": "2025-10-24T18:08:38Z",
+  "scorer_name": "PickScore",
+  "scorer_version": "YOUR_VERSION_OR_HASH",
+  "prompt_aware": true,
+  "prompt_hash_algo": "sha256(utf8)",
+  "reward_transform_id": "ps_minus_20_times_3",
+  "reward_formula": "reward = (pickscore_raw - offset) * scale",
+  "reward_offset": 20.0,
+  "reward_scale": 3.0,
+  "run_id": "2025-10-22_16-53-39"
+}
